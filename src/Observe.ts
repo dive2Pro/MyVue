@@ -1,5 +1,23 @@
-import any = jasmine.any;
 import {isNullOrUndefined} from "util";
+
+/**
+ * 获取形如 `o1.o2.o3`的值
+ * @param expr
+ * @param target
+ * @returns {any}
+ */
+function $expr(expr,target){
+
+    const p = expr.split(".");
+    const root = p.reduce((t,c)=>{
+        // console.log(t[c])
+        return t[c];
+    },target);
+    // console.log(root,expr,p,target)
+    return root
+}
+
+
 /**
  * 观察指定的数据,这里的 data.d1 肯定不能直接添加callback方法
  *   所以在 对象的 get 和 set 方法中做文章
@@ -10,20 +28,19 @@ import {isNullOrUndefined} from "util";
  * @return 返回的是一个 ObservableView 对象
  */
  // export  function $watch(expr:string,callback:()=>{},imme?:boolean);
- export function $watch( expr: string, callback: () => void, imme?: boolean): ObservableView {
+
+function $watch( expr: string, callback: () => void, imme?: boolean): ObservableView {
     let target=this.data
-    console.log(this)
     function activeNestObject(property){
         const parent = property;
         ;(typeof parent == 'object') &&  Object.keys(parent).filter(key=>parent.hasOwnProperty(key)).forEach(key=>{
             activeNestObject(parent[key])
         })
-
     }
 
     let returned = new ObservableView(()=>{
-        console.log('root = ',target[expr])
-        activeNestObject(target[expr])
+        const root = $expr(expr,target);
+        activeNestObject(root)
     }, callback);
     returned.data;
     return returned
@@ -34,16 +51,15 @@ function makeObserveable<P>(target,child?:boolean): any {
     /**
      *返回的对象
      *     这个对象属性都是可观察的
-     *     所以需要劫持其所有属性的 get set方法
+     *     只暴露 data属性
      */
-
     function extendObj(obj) {
         let newObj: any
         if(!child){
             newObj = { data : Object.is(obj.type,BasedefiendPrimitive)?obj.data:obj};
-            console.log(newObj)
+            // console.log(newObj)
             newObj.$watch=$watch.bind(newObj)
-
+            newObj.$expr=$expr.bind(newObj);
         }else{
             // console.log(obj)
             newObj = obj
@@ -60,10 +76,8 @@ function makeObserveable<P>(target,child?:boolean): any {
     else if (Array.isArray(target)) {
         // 需要劫持数组所有的方法
     } else {
-        // target = {...target};
         def = definedObject(target);
     }
-    // 最外层的这个对象需要进行加工,返回
     def = extendObj(def);
     return def
 }

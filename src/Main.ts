@@ -1,74 +1,16 @@
-import {$watch, asStruct, Observe} from './Observe'
+import {Vue} from './Vue'
 
 
 
-// var test = Observe(15)
-// console.log(test.data)
-
-// test.data = 14
-// console.log(test.data)
-// test.data = 11
-// console.log(test.data)
-
-// const obj1 = Observe({age: 12, sex: 'man'})
-// console.log(obj1)
-// obj1.age = 13
-// console.log(obj1)
-// obj1.age = 13
-// obj1.age = 15
-// obj1.age = '130000'
-// console.log(obj1.age)
-// obj1.sex = 'haah'
-// console.log(obj1.sex)
-
-const oo = Observe(25);
-const complicateObj = {
-  age: 12,
-  oo,
-  favois: {song: '7ers', sport: 'ball', game: {name: 'dota2', year: 2012}}
-};
-// const cobj = Observe(complicateObj);
-
-// console.log(cobj);
-
-// cobj.favois.song = '6year';
-// // console.log(cobj.favois.song);
-// cobj.favois.game.name = '6year --';
-// // console.log(cobj.favois.game.name);
-// oo.data = 13
-// console.log(complicateObj.oo.data)
-// console.log(cobj.favois.game.year);
-// const structObj = {
-//   age: 26,
-//   favois: {song: '7ers', sport: 'ball', game: {name: 'dota2', year: 2012}}
-// }
-//
-// const structJ = Observe(asStruct(structObj))
-// console.log(structJ)
-// // 不支持动态添加观察
-// structJ.haha = 'zou'
-// console.log('=============================')
-// structJ.age = {
-//   startYear: 1991,
-//   endYear: 2016
-// };
-// console.log(structJ, structJ.age)
-// // structJ.age.$watch(
-// // (cur, prev) => {console.log(`I'm now  ${cur} ,prev = ${prev}`)})
-// structJ.age.endYear = 1998;
-// console.log(structJ)
-
-
-let o1 = {age:12,pivot:'haah',friend:{favo:"game",time:1997}}
-const obs1=Observe(asStruct(o1))
-
-let p2='friend',newFavo = {time:'dota2'}
-
-obs1.$watch(p2,function(){
-  expect(obs1.data.friend).toEqual({...o1.friend,time:newFavo.time});
-  expect(obs1.data.friend.time).toBe('dota2');
-  // done()
+new Vue({
+    el:'app',
+    data:{
+        user:{
+            name:'hyc',
+            age:26,
+            some:{
+                s:'123'
+            }
+        }
+    }
 });
-
-// obs1.friend.time='dota2'
-console.log(obs1)
