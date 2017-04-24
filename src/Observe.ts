@@ -1,103 +1,340 @@
-
+import any = jasmine.any;
+import {isNullOrUndefined} from "util";
 /**
- * 原子,用来扩展一个对象
+ * 观察指定的数据,这里的 data.d1 肯定不能直接添加callback方法
+ *   所以在 对象的 get 和 set 方法中做文章
  *
+ * @param expr eg:'data.d1'
+ * @param callback
+ * @param imme 如果true 直接调用一次callback
+ * @return 返回的是一个 ObservableView 对象
  */
-class Atom {}
+ // export  function $watch(expr:string,callback:()=>{},imme?:boolean);
+ export function $watch(targ, expr: string, callback: () => void, imme?: boolean): ObservableView {
+    let target
+    if (targ) {
+        target = targ
+    } else if (this === window || this === document) {
+
+    }else{
+        target = this
+    }
+
+    let returned = new ObservableView(() => {
+
+        console.log(expr, '---',target[expr])
+    }, callback);
+    returned.data;
+    return returned
+}
 
 
-
-/**
- * 传入一个对象,将其改造成Atom
- *
- */
 function makeObserveable<P>(target): any {
-  /**
-   *返回的对象
-   *     这个对象属性都是可观察的
-   *     所以需要劫持其所有属性的 get set方法
-   *
-   */
+    /**
+     *返回的对象
+     *     这个对象属性都是可观察的
+     *     所以需要劫持其所有属性的 get set方法
+     */
+    function extendObj(obj) {
+        let newObj: any = {data: obj.data};
 
-  let def;
 
-  // 如果传入的为空
-  console.log(typeof target, '---');
-  if (!!target === false) {
-  }
-  // 如果只是 基本类型 返回一个
-  else if (typeof target != 'object') {
-    def = defiendPrimitive(target)
-  } else if (Array.isArray(target)) {
-  } else {
-    // 如果是一个对象
-    def = definedObject(target);
-  }
+        return newObj
+    }
 
-  return def
+
+    let def;
+    // 如果传入的为空
+    if (!!target === false) {
+        console.log(typeof target, '---');
+    } else if (typeof target != 'object') {
+        def = definedObject({data: target})
+
+    }
+
+    else if (Array.isArray(target)) {
+        // 需要劫持数组所有的方法
+    } else {
+        target = {...target};
+        def = definedObject(target);
+        // def = defiendPrimitive(def, def.type)
+    }
+
+    // 最外层的这个对象需要进行加工,返回
+    // def = extendObj(def);
+    return def
 }
 
 export {makeObserveable as Observe};
 
-class BasedefiendPrimitive {
-  constructor(data: any) {}
+export class BasedefiendPrimitive {
+
+}
+export class SimpleObject {
+}
+export class StructObject {
 }
 
+export class ComputeObject {
 
+}
+
+function asStruct(obj) {
+    Object.defineProperty(obj, 'type', {
+        writable: true,
+        enumerable: false,
+        configurable: true,
+        value: StructObject
+    });
+    return obj
+}
+export {
+    asStruct
+}
 /**
  * 观察和发送订阅事件,
  */
 class SimpleEventEmiiter {
-  sub() {}
 
-  unSub() {}
-  emit(prev, cur) {}
+    listeners: ((any) => void)[] = [];
+
+    sub(listener) {
+        this.listeners.push(listener);
+    }
+
+    unSub(listener) {
+        this.listeners = this.listeners.filter(l => l == listener)
+    };
+
+    emit(cur, prev?) {
+
+        this.listeners.forEach(lis => lis.call(null, cur, prev))
+
+    };
+
+}
+/**
+ * 栈结构的数组
+ *  [] : 当前的栈的级别,如果一个对象观测的有多个 ObservableView嵌套使用,这里会和嵌套的层级数一致
+ *  [][]: 保存当前的级别中的Atom
+ */
+let ObserveAtomStack: Atom[][] = [];
+/**
+ * 原子,数据改变的主要联系者
+ *  持有
+ *     观察的对象原子集合
+ *     被观察的对象原子集合
+ *  在数据改变时按需遍历通知这些集合
+ *
+ */
+class Atom {
+    observerings: Atom[] = []; // 本原子正在观测的对象原子
+    observers: Atom[] = [];// 正在观测本原子的对象原子
+    prevObserverings: Atom[] = []
+    prevObservers: Atom[] = []
+    value: any // 当前的值
+    obs: Observable
+
+    constructor(obs: Observable) {
+        this.obs = obs
+    }
+
+    changeValue(value) {
+        const prevValue = this.value;
+        this.value = value;
+        this.activeObservers();
+        this.actualChange(prevValue !== value);
+
+    }
+
+    actualChange(changed: boolean) {
+        if (changed) {
+            // console.log('changed = ' + changed,this.observers)
+            this.observers.forEach((o => {
+                o.obs.reactive();
+            }))
+
+        }
+    }
+
+    activeObservers() {
+        this.prevObservers = this.observers;
+        this.checkObserver();
+        this.bindObservers();
+
+    }
+
+    /**
+     * 将当前的Atom入栈
+     */
+    checkObserver=()=> {
+        const currentStack = ObserveAtomStack[ObserveAtomStack.length-1];
+        if (!isNullOrUndefined(currentStack)) {
+            currentStack[currentStack.length] = this
+        }
+    }
+
+    bindObservers=()=> {
+        const currentStack = ObserveAtomStack[ObserveAtomStack.length-1];
+        if (!isNullOrUndefined(currentStack)) {
+            const observeView = currentStack[0];
+            if (this.observers.indexOf(observeView) === -1) {
+                this.observers.push(observeView)
+            }
+            observeView.checkObserings(this);
+        }
+        // console.log('ObserveAtomStack',this.observers)
+    }
+
+    checkObserings(atom: Atom) {
+
+        if (this.observerings.indexOf(atom) > -1) {
+            this.observerings.push(atom)
+        }
+    }
+
 }
 
-class Observale {
-  tpye: object;
-  public $data: any
-  simpleEventEmiiter = new SimpleEventEmiiter()
-  constructor(data){this.data = data}
 
-  set data(value: any) {
-    console.log('set');
-    const prevValue = this.data;
-    this.$data = value;
-    // 发送事件
-    this.simpleEventEmiiter.emit(prevValue, value)
-  }
+class Observable {
+    protected type: object;
+    /* 数据的结构类型*/
+    protected $data: any;
+    protected key: string
+    /* 当前获取的值的 名字*/
+    protected atom = new Atom(this);
+    protected simpleEventEmiiter = new SimpleEventEmiiter();
 
-  get data() {
-    console.log('get');
-    return this.$data + '--'
-  }
+    constructor(data, type, key = 'data') {
+        this.$data = data;
+        this.type = type;
+        this.key = key;
+    }
+
+    set data(value: any) {
+        const prevValue = this.data;
+        // console.log(`key = ${this.key} ;value = ${value} this.type = ${Object.is(this.type, StructObject)}`);
+        if (!isObservable(value) && typeof value == 'object' && Object.is(this.type, StructObject)) {
+            this.$data = makeObserveable(value);
+        } else {
+            this.$data = value;
+        }
+
+        this.atom.changeValue(value)
+        this.simpleEventEmiiter.emit(value, prevValue);
+    }
+
+    get data() {
+        // console.log(`key = ${this.key}`);
+        this.atom.activeObservers();
+        return this.$data
+    }
+
+    $watch(lis: (cur, prev) => void, imme?: boolean) {
+        this.simpleEventEmiiter.sub(lis);
+        if (imme) {
+            this.simpleEventEmiiter.emit(this.$data)
+        }
+    }
+
+    reactive() {
+
+    }
+
+
+    toString() {
+        return `type = ${this.type}    data = ${this.$data}`
+    }
+
+}
+
+class ObservableView extends Observable {
+    expr: () => void
+
+    constructor(expr, func: () => void) {
+        super(null, ComputeObject, 'compute Value');
+        this.expr = expr;
+        this.simpleEventEmiiter.sub(func)
+    }
+
+    set data(value) {
+        throw `ObservableView can't set a new value`
+    }
+
+    /**
+     *
+     */
+    get data() {
+        ObserveAtomStack[ObserveAtomStack.length] = [this.atom];
+        let value = this.expr.call(null);
+        ObserveAtomStack.pop();
+        return value
+    }
+
+    reactive() {
+        this.simpleEventEmiiter.emit(this.data);
+    }
+}
+
+/**
+ * 检测是否是观察对象
+ * @param target
+ * @returns {boolean}
+ */
+function isObservable(target): boolean {
+    const type = target.type;
+    return Object.is(type, SimpleObject)
+        || Object.is(type, BasedefiendPrimitive)
+        || Object.is(type, StructObject)
+        || Object.is(type, ComputeObject)
 }
 
 // 标识基本类型
-function defiendPrimitive(primitive) {
-  const type = new BasedefiendPrimitive(primitive);
-  const observer = new Observale(primitive);
-  return observer
+function defiendPrimitive(primitive, type, key?) {
+    type = type || BasedefiendPrimitive;
+    const observer = new Observable(primitive, type, key);
+    return observer
 }
 
+// 标识对象
+function definedObject(obj: any) {
+    const tag = SimpleObject;
+    let type = obj.type ? obj.type : tag;
 
-function definedObject(obj: {}) {
-  for (let key in obj) {
-    const primitiveObj = defiendPrimitive(obj[key])
-    Object.defineProperty(obj, key, {
-      configurable: true,
-      enumerable: true,
-      // writable: true,
-      get: function() {
-        return primitiveObj.data
-      },
-      set: function(value) {
-        console.log(value)
-        primitiveObj.data = value
-      }
-    })
-  }
+    for (let key in obj) {
+        // 如果是一个复杂对象
+        let value = obj[key];
 
-  return obj
+        const isComplicate = typeof value == 'object';
+        let newObj;
+        // console.log(isComplicate, value.type, !isObservable(value))
+        if (isComplicate && !isObservable(value)) {
+            value.type = type;
+            newObj = makeObserveable(value)
+        }
+
+        if (!Object.is(value.type, BasedefiendPrimitive))
+            newObj = defiendPrimitive(value, type, key);
+
+        Object.defineProperty(obj, key, {
+            configurable: true,
+            enumerable: true,
+            // writable: true,
+            get: function () {
+                return newObj.data
+            },
+            set: function (value) {
+                newObj.data = value
+            }
+        })
+    }
+
+    Object.defineProperty(obj, 'type', {
+        writable: true,
+        enumerable: false,
+        configurable: true,
+        value: type
+    });
+
+    return obj
 }
