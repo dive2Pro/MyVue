@@ -1,4 +1,4 @@
-import {asStruct, Observe} from './Observe'
+import {$watch, asStruct, Observe} from './Observe'
 
 
 
@@ -38,22 +38,37 @@ const complicateObj = {
 // oo.data = 13
 // console.log(complicateObj.oo.data)
 // console.log(cobj.favois.game.year);
-const structObj = {
-  age: 26,
-  favois: {song: '7ers', sport: 'ball', game: {name: 'dota2', year: 2012}}
-}
+// const structObj = {
+//   age: 26,
+//   favois: {song: '7ers', sport: 'ball', game: {name: 'dota2', year: 2012}}
+// }
+//
+// const structJ = Observe(asStruct(structObj))
+// console.log(structJ)
+// // 不支持动态添加观察
+// structJ.haha = 'zou'
+// console.log('=============================')
+// structJ.age = {
+//   startYear: 1991,
+//   endYear: 2016
+// };
+// console.log(structJ, structJ.age)
+// // structJ.age.$watch(
+// // (cur, prev) => {console.log(`I'm now  ${cur} ,prev = ${prev}`)})
+// structJ.age.endYear = 1998;
+// console.log(structJ)
 
-const structJ = Observe(asStruct(structObj))
-console.log(structJ)
-// 不支持动态添加观察
-structJ.haha = 'zou'
-console.log('=============================')
-structJ.age = {
-  startYear: 1991,
-  endYear: 2016
-};
-console.log(structJ, structJ.age)
-// structJ.age.$watch(
-// (cur, prev) => {console.log(`I'm now  ${cur} ,prev = ${prev}`)})
-structJ.age.endYear = 1998;
-console.log(structJ)
+
+let o1 = {age:12,pivot:'haah',friend:{favo:"game",time:1997}}
+const obs1=Observe(asStruct(o1))
+
+let p2='friend',newFavo = {time:'dota2'}
+
+obs1.$watch(p2,function(){
+  expect(obs1.data.friend).toEqual({...o1.friend,time:newFavo.time});
+  expect(obs1.data.friend.time).toBe('dota2');
+  // done()
+});
+
+// obs1.friend.time='dota2'
+console.log(obs1)

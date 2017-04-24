@@ -10,58 +10,61 @@ import {isNullOrUndefined} from "util";
  * @return 返回的是一个 ObservableView 对象
  */
  // export  function $watch(expr:string,callback:()=>{},imme?:boolean);
- export function $watch(targ, expr: string, callback: () => void, imme?: boolean): ObservableView {
-    let target
-    if (targ) {
-        target = targ
-    } else if (this === window || this === document) {
+ export function $watch( expr: string, callback: () => void, imme?: boolean): ObservableView {
+    let target=this.data
+    console.log(this)
+    function activeNestObject(property){
+        const parent = property;
+        ;(typeof parent == 'object') &&  Object.keys(parent).filter(key=>parent.hasOwnProperty(key)).forEach(key=>{
+            activeNestObject(parent[key])
+        })
 
-    }else{
-        target = this
     }
 
-    let returned = new ObservableView(() => {
-
-        console.log(expr, '---',target[expr])
+    let returned = new ObservableView(()=>{
+        console.log('root = ',target[expr])
+        activeNestObject(target[expr])
     }, callback);
     returned.data;
     return returned
 }
 
 
-function makeObserveable<P>(target): any {
+function makeObserveable<P>(target,child?:boolean): any {
     /**
      *返回的对象
      *     这个对象属性都是可观察的
      *     所以需要劫持其所有属性的 get set方法
      */
+
     function extendObj(obj) {
-        let newObj: any = {data: obj.data};
+        let newObj: any
+        if(!child){
+            newObj = { data : Object.is(obj.type,BasedefiendPrimitive)?obj.data:obj};
+            console.log(newObj)
+            newObj.$watch=$watch.bind(newObj)
 
-
+        }else{
+            // console.log(obj)
+            newObj = obj
+        }
         return newObj
     }
 
-
     let def;
-    // 如果传入的为空
     if (!!target === false) {
-        console.log(typeof target, '---');
+
     } else if (typeof target != 'object') {
-        def = definedObject({data: target})
-
+        def = defiendPrimitive(target,BasedefiendPrimitive)
     }
-
     else if (Array.isArray(target)) {
         // 需要劫持数组所有的方法
     } else {
-        target = {...target};
+        // target = {...target};
         def = definedObject(target);
-        // def = defiendPrimitive(def, def.type)
     }
-
     // 最外层的这个对象需要进行加工,返回
-    // def = extendObj(def);
+    def = extendObj(def);
     return def
 }
 
@@ -81,13 +84,14 @@ export class ComputeObject {
 
 function asStruct(obj) {
     Object.defineProperty(obj, 'type', {
-        writable: true,
-        enumerable: false,
+        writable: false,
+        enumerable: true,
         configurable: true,
         value: StructObject
     });
     return obj
 }
+
 export {
     asStruct
 }
@@ -107,7 +111,7 @@ class SimpleEventEmiiter {
     };
 
     emit(cur, prev?) {
-
+        console.log(this.listeners.length,'listeners  ')
         this.listeners.forEach(lis => lis.call(null, cur, prev))
 
     };
@@ -149,7 +153,7 @@ class Atom {
 
     actualChange(changed: boolean) {
         if (changed) {
-            // console.log('changed = ' + changed,this.observers)
+            console.log('changed = ' +changed,this.observers.length)
             this.observers.forEach((o => {
                 o.obs.reactive();
             }))
@@ -183,7 +187,7 @@ class Atom {
             }
             observeView.checkObserings(this);
         }
-        // console.log('ObserveAtomStack',this.observers)
+        // console.log('ObserveAtomStack',this.observers.length)
     }
 
     checkObserings(atom: Atom) {
@@ -209,13 +213,19 @@ class Observable {
         this.$data = data;
         this.type = type;
         this.key = key;
+        Object.defineProperty(this, 'type', {
+            writable: true,
+            enumerable: false,
+            configurable: true,
+            value: type
+        });
     }
 
     set data(value: any) {
         const prevValue = this.data;
         // console.log(`key = ${this.key} ;value = ${value} this.type = ${Object.is(this.type, StructObject)}`);
         if (!isObservable(value) && typeof value == 'object' && Object.is(this.type, StructObject)) {
-            this.$data = makeObserveable(value);
+            this.$data = makeObserveable(value,true);
         } else {
             this.$data = value;
         }
@@ -225,12 +235,12 @@ class Observable {
     }
 
     get data() {
-        // console.log(`key = ${this.key}`);
+        // console.log(`key --- = ${this.key}`);
         this.atom.activeObservers();
         return this.$data
     }
 
-    $watch(lis: (cur, prev) => void, imme?: boolean) {
+    addSub(lis: (cur, prev) => void, imme?: boolean) {
         this.simpleEventEmiiter.sub(lis);
         if (imme) {
             this.simpleEventEmiiter.emit(this.$data)
@@ -299,27 +309,33 @@ function defiendPrimitive(primitive, type, key?) {
 // 标识对象
 function definedObject(obj: any) {
     const tag = SimpleObject;
-    let type = obj.type ? obj.type : tag;
+    let parentType = obj.type ? obj.type : tag;
+
+    Object.defineProperty(obj, 'type', {
+        writable: false,
+        enumerable: false,
+        configurable: true,
+        value: parentType
+    });
 
     for (let key in obj) {
         // 如果是一个复杂对象
         let value = obj[key];
-
         const isComplicate = typeof value == 'object';
+        let type = isComplicate ? value.type : "" ;
         let newObj;
-        // console.log(isComplicate, value.type, !isObservable(value))
-        if (isComplicate && !isObservable(value)) {
-            value.type = type;
-            newObj = makeObserveable(value)
+
+        if (isComplicate && Object.is(parentType,StructObject)) {
+            value.type = parentType;
+            newObj = makeObserveable(value,true)
         }
 
-        if (!Object.is(value.type, BasedefiendPrimitive))
-            newObj = defiendPrimitive(value, type, key);
+        newObj = defiendPrimitive(value, parentType, key);
 
+        // console.log(newObj,key);
         Object.defineProperty(obj, key, {
             configurable: true,
             enumerable: true,
-            // writable: true,
             get: function () {
                 return newObj.data
             },
@@ -328,13 +344,6 @@ function definedObject(obj: any) {
             }
         })
     }
-
-    Object.defineProperty(obj, 'type', {
-        writable: true,
-        enumerable: false,
-        configurable: true,
-        value: type
-    });
 
     return obj
 }

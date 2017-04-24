@@ -16,8 +16,8 @@ describe("Observer testing",()=>{
     it('ObjectObserver',()=>{
         let o1 = {age:12,pivot:'haah'}
         const obs1=Observe(o1)
-        expect(obs1.age).toEqual(o1.age)
-        expect(obs1.pivot).toEqual(o1.pivot)
+        expect(obs1.data.age).toEqual(o1.age)
+        expect(obs1.data.pivot).toEqual(o1.pivot)
         let o2 ={
             age:12,pivot:'haah',firend:{
                 name:'hyc',age:25
@@ -26,38 +26,52 @@ describe("Observer testing",()=>{
         const obs2 = Observe(o2)
         // expect(obs2.age.type).toBe(SimpleObject)
         // expect(obs2.firend.type).toBe(SimpleObject)
-        expect(obs2.firend).toBe(o2.firend)
+        expect(obs2.data.firend).toBe(o2.firend)
     })
 
-    it("$watch",()=>{
+    it("$watch",( done)=>{
+        jest.useRealTimers();
         let o1 = {age:12,pivot:'haah',friend:{favo:"game"}}
         const obs1=Observe(asStruct(o1))
         const property = 'age',newValue = { year:2009 }
 
-        $watch(obs1,property,function(){
-            console.log(`property ${o1.age} changed => ${obs1.age}`)
-            expect(obs1.age).toBe(newValue)
+        obs1.$watch(property,function(){
+            console.log(`property ${o1.age} changed => ${obs1.data.age}`)
+            expect(obs1.data.age).toBe(newValue)
         });
 
-        obs1.age = newValue;
+        obs1.data.age = newValue;
 
 
         let p2='friend',newFavo = {Name:'dota2'}
-        $watch(obs1,p2,function(){
-            console.log(`property ${o1.friend} changed => ${obs1.friend}`)
-            expect(obs1.friend).toBe(newFavo)
-            expect(obs1.friend.Name).toBe('dota2')
+        obs1.$watch(p2,function(){
+            console.log(`property ${o1.friend} changed => ${obs1.data.friend}`)
+            expect(obs1.data.friend).toBe(newFavo)
+            expect(obs1.data.friend.Name).toBe('dota2')
+            done()
         });
 
-        obs1.friend = newFavo;
+        obs1.data.friend = newFavo;
 
-        let o2 ={
-            age:12,pivot:'haah',firend:{
-                name:'hyc',age:25
+    })
+
+it("$watch nest value",(done)=>{
+        let o1 = {age:12,pivot:'haah',friend:{favo:"game",time:1997}}
+        const obs1=Observe(asStruct(o1))
+
+        let p2='friend',newFavo = {time:'dota2'}
+
+    obs1.$watch(p2,function(){
+            expect(obs1.data.friend).toEqual({...o1.friend,time:newFavo.time});
+            expect(obs1.data.friend.time).toBe('dota2');
+            if(obs1.data.friend.favo=='porn'){
+
+                done()
             }
-        }
-        // const obs2 = Observe(o2)
+        });
 
+       obs1.data.friend.time='dota2'
+       obs1.data.friend.favo='porn'
     })
 
 
