@@ -54,14 +54,6 @@ function inspectNode(root: HTMLElement) {
          * 这种如果改变的话,会导致后面的节点不能被遍历到.
          * 所以要从后面向前面遍历
          *
-         * 还有 形如
-         * <code>
-         * <div id='app'>
-         *     <div>{{}}</div>
-         *     -{{user.title}} -@@ -  {{user.year}} - -======={{user.year}}{{user.year}} - -
-         *  </div>
-         * <code>
-         *
          */
         if (node.nodeType === 3&&node.textContent!="") {
             let ary,content =node.textContent;
