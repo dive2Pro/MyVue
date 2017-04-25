@@ -65,7 +65,7 @@ function inspectNode(root: HTMLElement) {
                 console.log(bathness,name)
                 node.splitText(node.textContent.indexOf(bathness));
                 let next = node.nextSibling;
-                next.splitText(next.textContent.indexOf("}}"));
+                next.splitText(next.textContent.indexOf("}}")+2);
                 node = next.nextSibling
                 content = next.nextSibling.textContent;
                 __TextNodes[name]=__TextNodes[name]?__TextNodes[name]:[]
