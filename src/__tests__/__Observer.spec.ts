@@ -64,15 +64,41 @@ describe("Observer testing", () => {
         obs1.$watch(p2, function () {
             expect(obs1.data.friend).toEqual({...o1.friend, time: newFavo.time});
             expect(obs1.data.friend.time).toBe('dota2');
-            if (obs1.data.friend.favo == 'porn') {
+            if (obs1.data.friend.favo == 'por') {
 
                 done()
             }
         });
 
         obs1.data.friend.time = 'dota2'
-        obs1.data.friend.favo = 'porn'
+        obs1.data.friend.favo = 'por'
     })
 
+
+    it("$expr",(done)=>{
+        let o1 = {age: 12, pivot: 'haah', friend: {favo: "game", time: 1997}}
+        const obs1 = Observe(asStruct(o1))
+
+        let p2 = 'friend', newFavo = {time: 'dota2'}
+        expect(obs1.$expr("friend.favo")).toEqual('game');
+        let e1 = obs1.$expr('friend.favo');
+
+        let expr = 'friend.favo';
+        // obs1.data.friend.favo=13
+        obs1.$watch(expr, function () {
+
+            if(obs1.data.friend.favo==19)
+            {
+                done()
+            }
+
+        });
+        obs1.$exprset(expr,13)
+        expect(obs1.$expr("friend.favo")).toEqual(13);
+
+        obs1.$exprset(expr,19)
+
+
+    })
 
 });

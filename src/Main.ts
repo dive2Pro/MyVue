@@ -10,7 +10,11 @@ new Vue({
             age:26,
             some:{
                 s:'123'
-            }
+            },
+            title:13,
+            year:2019
         }
     }
+
+
 });
