@@ -142,7 +142,8 @@ function $watch(expr: string, callback: () => void, imme?: boolean): ObservableV
 
         emit(cur, prev?) {
             // console.log(this.listeners.length, 'listeners  ')
-            this.listeners.forEach(lis => lis.call(null, cur, prev))
+            const listeners = this.listeners.slice()
+            listeners.forEach(lis => lis.call(null, cur, prev))
 
         };
 
@@ -217,7 +218,6 @@ function $watch(expr: string, callback: () => void, imme?: boolean): ObservableV
                 }
                 observeView.checkObserings(this);
             }
-            // console.log('ObserveAtomStack',this.observers.length)
         }
 
         checkObserings(atom: Atom) {
@@ -252,7 +252,7 @@ function $watch(expr: string, callback: () => void, imme?: boolean): ObservableV
 
         set data(value: any) {
             const prevValue = this.data;
-            console.log(`key = ${this.key} ;value = ${value} this.type = ${Object.is(this.type, StructObject)}`);
+            // console.log(`key = ${this.key} ;value = ${value} this.type = ${Object.is(this.type, StructObject)}`);
             if (!isObservable(value) && typeof value == 'object' && Object.is(this.type, StructObject)) {
                 this.$data = makeObserveable(value, true);
             } else {
@@ -264,7 +264,6 @@ function $watch(expr: string, callback: () => void, imme?: boolean): ObservableV
         }
 
         get data() {
-            // console.log(`key --- = ${this.key}`);
             this.atom.activeObservers();
             return this.$data
         }

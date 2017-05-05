@@ -1,19 +1,48 @@
 import {asStruct, Observe} from './Observe'
 
 
-let __Vmodels = {}
-function inspectVmodel(node: HTMLElement) {
-    if (node.tagName === 'INPUT' && node.getAttribute('type') === 'text') {
-        const attrModel = node.getAttribute('v-model')
-        if (attrModel) {
-            let vm = __Vmodels[attrModel];
-            __Vmodels[attrModel] = vm ? vm : [];
-            __Vmodels[attrModel].push(node);
+function bindVon(node,name){
+
+}
+
+
+/**
+ * 检查是否有 v-on 事件观察
+ *
+ * @param node
+ */
+let reg_V_on = /^(v-on)/g;
+let reg_V_model = /^v-model/g;
+let __Vmodels = {};
+let __Vons = {};
+
+let __TextNodes = {};
+
+function inspectV(node:HTMLElement){
+    const attrs = [].slice.call(node.attributes);
+
+    for (let v in attrs) {
+        /** http://www.w3school.com.cn/jsref/dom_obj_attributes.asp */
+        const {name,value} = attrs[v];
+
+        if(reg_V_on.test(name)){
+            let ens = __Vons[value];
+            __Vons[name] = ens ? ens:[];
+            __Vons[name].push({node,value});
+
+        }else if(reg_V_model.test(name)){
+            let vm = __Vmodels[value];
+            __Vmodels[value] = vm ? vm : [];
+            __Vmodels[value].push(node);
+
         }
+
     }
 }
 
-let __TextNodes = {};
+
+
+
 function replaceTextNode(node, content) {
     let match;
     const parent = node.parentNode
@@ -40,7 +69,6 @@ function replaceTextNode(node, content) {
 
 function inspectNode(root: HTMLElement) {
     const children = root.childNodes;
-    console.log(children,root.tagName==='SPAN');
     const newChldren =[].slice.call(children);
     newChldren.forEach( function (node) {
         /**
@@ -62,7 +90,6 @@ function inspectNode(root: HTMLElement) {
                 ary = vueReg.exec(content)
                 if(!ary)return
                 const [bathness , name] = ary;
-                console.log(bathness,name)
                 node.splitText(node.textContent.indexOf(bathness));
                 let next = node.nextSibling;
                 next.splitText(next.textContent.indexOf("}}")+2);
@@ -75,7 +102,7 @@ function inspectNode(root: HTMLElement) {
             if (node.childNodes.length>0) {
                 inspectNode(node);
             }
-            inspectVmodel(node)
+            inspectV(node);
         }
     });
 }
@@ -93,48 +120,137 @@ function inspectNode(root: HTMLElement) {
  * @constructor
  */
 
-function SpecHtml(root: string) {
-    const html = document.getElementById(root);
+function SpecHtml() {
+    const that = this;
+
+    const html = document.getElementById(that.$el);
     // 遍历文档
     if (html) {
         inspectNode(html);
     }
-
 }
 
 
 interface  IVueProps {
     el: string,
-    data: object
+    data: object,
+    methods:object// { key:func }
 }
 
-export function Vue(mode: IVueProps) {
+export class  Vue{
+    $el:string
+    $data:object
+    $methods:object
+    $model
+    constructor(mode: IVueProps){
+        const {el, data,methods} = mode
+        this.$el=el
+        this.$data=data
 
-    const {el, data} = mode
-    const parms = SpecHtml(el);
-    const model = Observe(asStruct(data));
-    console.log(__TextNodes)
-    for (let item in __TextNodes) {
-        let textNodes = __TextNodes[item];
-
-        let v = model.$watch(item, () => {
-            const d = model.$expr(item) || " ";
-            // console.log(textNodes)
-            textNodes.forEach(n => {
-                n.textContent = d+""
+        Object.getOwnPropertyNames(data).forEach(name=>{
+            Object.defineProperty(this,name,{
+                enumable:false,
+                configurable:true,
+                writable:true,
+                value:data[name]
             })
-        }, true)
-        // console.log(v)
+        });
+
+        this.$methods=methods
+
+        this.init()
     }
 
-    for (let item in __Vmodels) {
-        __Vmodels[item].forEach(dc => {
-            dc.addEventListener('input', function (e) {
-                let obv = model.$expr(item);
-                let val = e.target.value;
-                model.$exprset(item, val)
-                console.log(model.data)
-            }, false)
-        })
+    init(){
+        SpecHtml.call(this);
+        this.bindVModel()
+        this.bindVOns();
+    }
+
+    $eval(value){
+        console.log(value)
+    }
+    bindVOns(){
+        for(let name in __Vons){
+            let objs = __Vons[name];
+            const eventName = name.split(":").pop();
+            if(eventName == null){
+                continue
+            }
+            let expressReg = //g// 如果其
+            objs.forEach(({node,value})=>{
+                console.log(value)
+                /**
+                 * 在模板中的调用可能是这样的
+                 * 没有回调参数
+                 * <code>
+                 * <div v-on:click="handleClick">click</div>
+                 *
+                 * </code>
+                 * or
+                 * 有回调参数,参数可能是string,或者是data中的数据,
+                 * <code>
+                 * <div v-on:click="handleClick('string')">click</div>
+                 * <div v-on:click="handleClick( count+=1 )">click</div> ?
+                 * </code>
+                 * 目前能够得到的只是一串字符,目前知道的是 eval会执行这段字符串
+                 * 但这时里面的 参数如果是表达式的话 如何去找到对应的值呢?
+                 *
+                 */
+
+                let val,handler
+                if(isSimpleMethod(value)){
+                    handler = this.$methods[value].call(this);
+                }else{
+
+                    const argsReg = /(.+?)\((.+?)\)/g;
+                    let ary = argsReg.exec(value)
+                    if(ary){
+                        let [,methodName,args]=ary
+                        args =eval(args)
+
+                        handler= this.$methods[methodName].bind(this,args);
+                    }
+                }
+
+                bindEvent.call(this,node,eventName,handler)
+
+            });
+
+        }
+    }
+    bindVModel(){
+        let  model  = this.$model = Observe(asStruct(this.$data));
+        for (let item in __TextNodes) {
+            let textNodes = __TextNodes[item];
+
+            let v = model.$watch(item, () => {
+                const d = model.$expr(item) || " ";
+                textNodes.forEach(n => {
+                    n.textContent = d+""
+                })
+            }, true)
+        }
+
+        for (let item in __Vmodels) {
+            __Vmodels[item].forEach(dc => {
+                dc.addEventListener('input', function (e) {
+                    let obv = model.$expr(item);
+                    let val = e.target.value;
+                    model.$exprset(item, val);
+                }, false)
+            })
+        }
     }
 }
+
+
+function isSimpleMethod(str):boolean{
+    return !/\(.+?\)/.test(str)
+}
+
+function bindEvent(node,name,func){
+    node.addEventListener(name,func,false)
+}
+
+

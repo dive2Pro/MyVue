@@ -13,5 +13,10 @@ new Vue({
             },
             title:13
         }
+    },
+    methods:{
+        changeTitle:function(title){
+            this.user.title=title;
+        }
     }
 });
